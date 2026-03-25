@@ -1,0 +1,126 @@
+# CLAUDE.md Templates for SonarQube Integration
+
+Two templates are provided below. Copy the one that matches your desired
+workflow into your project's `CLAUDE.md` (or `~/.claude/CLAUDE.md` for
+global application).
+
+---
+
+## Template A — Minimal (Phase 1 / Phase 2)
+
+Suitable for teams starting out. Adds a verification gate without requiring
+guidelines to be fetched automatically.
+
+```markdown
+# SonarQube Integration
+
+## Code Quality Gate
+
+Before finalising any source file you have created or modified:
+
+1. Run `run_advanced_code_analysis` on the file.
+2. If any issues are found at BLOCKER, CRITICAL, or MAJOR severity, fix them.
+3. Re-run analysis to confirm the fixes are clean.
+4. Do not declare a task complete until all modified files pass with no
+   BLOCKER, CRITICAL, or MAJOR issues.
+
+When fixing an issue, use the rule key from the analysis result to look up
+the rule documentation for specific guidance.
+```
+
+---
+
+## Template B — Full (Phase 3 — Autonomous Guide-Generate-Verify Loop)
+
+For teams that want the full automated loop. Claude will guide itself through
+the complete workflow without prompting.
+
+```markdown
+# SonarQube Integration — Autonomous Mode
+
+## Before Writing Any Code
+
+When implementing a new feature, adding a class, or making a significant
+change to an existing class:
+
+1. Call `get_guidelines` with:
+   - `mode: "combined"`
+   - `categories`: relevant categories for the code being written (e.g.,
+     "Code Complexity & Maintainability", "Naming Conventions & Code Style",
+     "Exception/Error Handling", "Type System & Generics" for Java utility classes)
+   - `languages`: the language of the files being modified (e.g., `["java"]`)
+
+   Use the returned guidelines to inform code generation. Do not generate
+   code that violates rules flagged as BLOCKER or CRITICAL in the guidelines.
+
+2. When adding to or modifying an existing class, call the relevant
+   architecture tools to understand the context:
+   - `get_current_architecture(depth=1)` — understand package-level structure
+   - `get_type_hierarchy(fqn)` — understand what extends/implements the class
+   - `get_references(fqn)` — understand who uses the class (blast radius)
+
+   Follow existing patterns in the codebase rather than inventing new ones.
+
+## After Writing or Modifying Any Source File
+
+After every source file modification (not just at the end of a task):
+
+1. Call `run_advanced_code_analysis` on the modified file with:
+   - `filePath`: the project-relative path (e.g., `src/main/java/.../MyClass.java`)
+   - `branchName`: the current git branch
+   - `fileScope`: `["MAIN"]` for production code, `["TEST"]` for test files
+
+2. If issues are found:
+   a. For each issue, note the rule key (e.g., `java:S1172`)
+   b. Fix the issue in the source file
+   c. Re-run `run_advanced_code_analysis` on the same file
+   d. Repeat until the file has no BLOCKER, CRITICAL, or MAJOR issues
+
+3. Only proceed to the next file after the current file is clean.
+
+## Completion Criteria
+
+Never declare a task complete until:
+- All source files created or modified in this task have been analysed
+- None of them have BLOCKER, CRITICAL, or MAJOR issues
+- The final analysis run shows a clean result for every modified file
+
+Report the final issue count (zero) when declaring the task complete.
+```
+
+---
+
+## Notes on Customisation
+
+### Adjusting severity thresholds
+
+Both templates use BLOCKER/CRITICAL/MAJOR as the "must fix" threshold.
+Adjust this to match your team's standards:
+- Strict: also fix MINOR issues
+- Lenient: only fix BLOCKER and CRITICAL
+
+### Scoping guidelines fetches
+
+The `categories` parameter in `get_guidelines` accepts any of these values:
+- `"Code Complexity & Maintainability"`
+- `"Naming Conventions & Code Style"`
+- `"Exception/Error Handling"`
+- `"Type System & Generics"`
+- `"Serialization & Collections API"`
+- `"Testing Practices & Coverage"`
+- `"REST API Development"`
+- `"Authentication & Authorization"`
+- `"Web Security (XSS, CSRF, Injection)"`
+- `"Logging & Monitoring"`
+- (full list in the SonarQube MCP documentation)
+
+Choosing relevant categories produces more targeted guidelines and faster
+tool responses.
+
+### Project-specific additions
+
+Add any project-specific conventions below the template sections. For example:
+- Package naming conventions
+- Required imports or banned APIs
+- Custom checkstyle rules not covered by SonarQube
+```
