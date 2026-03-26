@@ -164,16 +164,7 @@ scoped token, because organization tokens do not have the permissions needed
 for analysis submission. Generate one in SonarQube Cloud under
 **My Account → Security → Generate Tokens**.
 
-### Step 1: Install the SonarQube CLI
-
-The analysis engine inside the MCP container uses the SonarQube CLI to perform
-local analysis with full project context. Install it with:
-
-```bash
-curl -o- https://raw.githubusercontent.com/SonarSource/sonarqube-cli/refs/heads/master/user-scripts/install.sh | bash
-```
-
-### Step 2: Set Your Token in the Environment
+### Step 1: Set Your Token in the Environment
 
 Add your user token to your shell profile for persistent access across sessions:
 
@@ -187,7 +178,7 @@ Or set it for the current terminal session only:
 export SONARQUBE_TOKEN="your_token_here"
 ```
 
-### Step 3: Register the MCP Server with Claude Code
+### Step 2: Register the MCP Server with Claude Code
 
 Change to your project directory, then run this command — replacing
 `your_org_id` and `your_project_key` with your actual values:
