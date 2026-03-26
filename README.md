@@ -74,9 +74,7 @@ and structure.
 
 #### Rule context: `get_guidelines`
 
-`get_guidelines` returns the specific Sonar rules enabled for your project,
-with rule descriptions, compliant and non-compliant code examples, and
-configured severity — not generic advice.
+`get_guidelines` returns the specific Sonar rules enabled for your project - not generic advice.
 
 It supports three `mode` values:
 
