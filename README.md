@@ -11,13 +11,13 @@
 
 ## Table of Contents
 
-1. [Overview — The Verification Gap](#overview)
-2. [How These Tools Actually Work](#how-it-works)
-3. [Prerequisites and Setup](#setup)
-4. [Phase 1 — Crawl: Manual Verification](#phase-1)
-5. [Phase 2 — Walk: Skills and Standards](#phase-2)
-6. [Phase 3 — Run: Autonomous Guide-Generate-Verify Loop](#phase-3)
-7. [Insights: Getting the Most From These Tools](#insights)
+1. [Overview — The Verification Gap](#overview--the-verification-gap)
+2. [How These Tools Actually Work](#how-these-tools-actually-work)
+3. [Prerequisites and Setup](#prerequisites-and-setup)
+4. [Phase 1 — Crawl: Manual Verification](#phase-1--crawl-manual-verification)
+5. [Phase 2 — Walk: Skills and Standards](#phase-2--walk-skills-and-standards)
+6. [Phase 3 — Run: Autonomous Guide-Generate-Verify Loop](#phase-3--run-autonomous-guide-generate-verify-loop)
+7. [Insights: Getting the Most From These Tools](#insights-getting-the-most-from-these-tools)
 8. [Measuring Impact](#measuring-impact)
 9. [Appendix](#appendix)
 
@@ -41,7 +41,7 @@ Java best practices and common patterns, but it does not know:
 
 - Which specific Sonar rules are configured for your project
 - Which rules your team has elevated to blockers
-- How your current code base is structured (what extends what, who calls what)
+- How your current codebase is structured (what extends what, who calls what)
 - Where in the architecture a new class should sit
 
 **SonarQube's MCP server** gives Claude Code two capabilities that address
@@ -74,7 +74,7 @@ and structure.
 
 #### Rule context: `get_guidelines`
 
-`get_guidelines` returns the specific Sonar rules enabled for your project - not generic advice.
+`get_guidelines` returns the specific Sonar rules enabled for your project — not generic advice.
 
 It supports three `mode` values:
 
@@ -690,8 +690,8 @@ The fix effort scales with algorithmic complexity.
 in the first draft.** This is the target state: the developer gets clean code
 without any manual iteration.
 
-**Tool call overhead is modest.** The full Phase 3 loop used 4 tool calls
-(1 guidelines + 1 architecture + 2 analysis). This is roughly 10-15 seconds
+**Tool call overhead is modest.** The full Phase 3 loop used 5 tool calls
+(1 guidelines + 2 architecture + 2 analysis). This is roughly 10-15 seconds
 of additional latency for a feature that would otherwise require multiple
 CI pipeline runs to clean up.
 
