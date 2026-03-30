@@ -49,7 +49,7 @@ this directly:
 
 | Capability | Tool category | What it does |
 |------------|---------------|--------------|
-| **Context Augmentation** (CAG) | `get_guidelines`, `get_current_architecture`, `get_type_hierarchy`, etc. | Injects Sonar rule knowledge and code structure *before* the AI writes code |
+| **Context Augmentation** (CAG) | `get_guidelines`, `get_current_architecture`, `get_type_hierarchy`, `get_references`, `get_downstream_call_flow`, `get_upstream_call_flow`, `search_by_signature_patterns`, `search_by_body_patterns`, `get_source_code`, `get_intended_architecture` | Injects Sonar rule knowledge and code structure *before* the AI writes code |
 | **Agentic Analysis** | `run_advanced_code_analysis` | Runs a full CI-level Sonar analysis on a file *in the editor*, with cross-file context |
 
 Used together, these capabilities enable a **Guide → Generate → Verify** loop
@@ -66,34 +66,106 @@ what measurable difference it makes.
 
 ### Context Augmentation: What Gets Injected and Why It Matters
 
-When you call `get_guidelines`, the SonarQube MCP server returns the specific
-Sonar rules that are enabled for your project, along with rule descriptions,
-compliant and non-compliant code examples, and the severity level configured
-for each rule.
+CAG tools fall into two categories: **rule context** (what Sonar will flag)
+and **structural context** (how your codebase is organised). Used together
+before code generation, they turn the AI from a general-purpose generator
+into a context-aware collaborator that understands *your* project's rules
+and structure.
 
-This is not generic "Java best practices" advice. It is a precise, project-
-specific list of the issues that SonarQube will flag in your CI pipeline.
-When this context is injected *before* code generation, the AI can:
+#### Rule context: `get_guidelines`
 
-- Avoid patterns that are already known to trigger issues in your project
-- Choose compliant API usage from the outset (e.g., using `Math.hypot` over
-  manual Pythagorean calculation when the rule requires it)
-- Write code that follows the declaration styles your rules enforce
+`get_guidelines` returns the specific Sonar rules enabled for your project - not generic advice.
 
-The other CAG tools provide **structural context**:
+It supports three `mode` values:
 
-- `get_current_architecture` — shows the dependency graph of your project's
-  packages and modules, so the AI knows where new code fits
-- `get_type_hierarchy` — shows what extends and implements what, so the AI
-  can follow existing patterns rather than inventing new ones
-- `get_references` — shows which classes use a given class, so the AI
-  understands the blast radius of any change
-- `search_by_signature_patterns` / `search_by_body_patterns` — lets the AI
-  find existing patterns in your code to replicate
+| Mode | What it returns | When to use |
+|------|-----------------|-------------|
+| `"project_based"` | Guidelines derived from real open issues in your SonarQube project | When you want to focus on problems already present |
+| `"category_based"` | Guidelines from a pre-selected set of rule categories | When starting a new file with no existing issues to draw from |
+| `"combined"` | Merges both of the above | Default for most sessions — broadest coverage |
 
-Together, these tools turn the AI from a general-purpose code generator into
-a context-aware collaborator that understands *your* project's rules and
-structure.
+**Key parameters:**
+
+- `languages` (required for category-based and combined modes) — SonarQube
+  repository key format: `"java"`, `"python"`, `"typescript"`, `"javascript"`,
+  `"csharp"`, `"cpp"`, `"php"`, `"xml"`, `"html"`, `"css"`.
+- `categories` (required for category-based and combined modes) — one or more
+  of 32 pre-defined categories. The most impactful for Java algorithm code:
+  - `"Code Complexity & Maintainability"` — cognitive complexity, loop
+    structure, break/continue
+  - `"Naming Conventions & Code Style"` — `java:S1659` (grouped declarations),
+    `java:S120` (package naming), `java:S117` (local variable naming)
+  - `"Exception/Error Handling"` — improper throws, empty catch blocks
+  - `"Type System & Generics"` — generic method overloads, bounded wildcards
+  - `"Spring Framework"`, `"JPA/Hibernate & Enterprise Java"`,
+    `"Modern Java Features"`, `"Serialization & Collections API"` — framework-
+    specific Java categories
+- `file_paths` (optional) — restrict guideline generation to issues found in
+  specific files, useful for targeted pre-generation context.
+
+#### Structural context tools
+
+These tools expose the dependency graph and type hierarchy that SonarQube
+builds from your project. They are available for **Java, JavaScript,
+TypeScript, Python, and C#** unless noted otherwise.
+
+**`get_current_architecture`** — shows the module/package dependency graph.
+Returns nodes with their FQNs, kind (package, module, class), depth, and
+dependency lists (`depends_on` / `depended_on_by`).
+
+Recommended workflow: start with `depth=0` to see top-level structure, then
+pass a specific FQN as `path_prefix` with a higher depth to drill into a
+subsystem. Note that FQN format varies by language — JavaScript/TypeScript
+modules use `:` as a separator (e.g., `my-module:com.example.service`),
+while Java uses `.`.
+
+**`get_intended_architecture`** — returns the user-defined allowed module
+relationships (if any are configured). The `meta.policy` field indicates
+whether unlisted dependencies are denied by default. If `constraints` is
+empty, all relationships are implicitly allowed.
+
+**`get_type_hierarchy`** — shows the full inheritance and implementation
+graph for a class, interface, enum, record, or struct. Returns parent and
+child nodes with their FQNs, file paths, and relationship kind
+(`EXTENDS`, `IMPLEMENTS`). Available for Java, JS, TS, Python, and C#.
+
+**`get_references`** — shows all **direct** inbound and outbound references
+for a given class, interface, or module FQN (not method FQNs — for method-
+level analysis use the call flow tools). Returns each referencing node's FQN,
+file path, and the `dependency_kinds` that describe the relationship. Use this
+to understand the blast radius of any change.
+
+**`get_downstream_call_flow`** / **`get_upstream_call_flow`** — traces the
+call graph from a method FQN forward (callees) or backward (callers) to a
+configurable depth. Useful for understanding what a method calls, or which
+entry points reach it. **Java only.**
+
+- `depth=0` returns only the method itself; `depth=1` (default) returns its
+  direct callees/callers; higher values recurse further.
+- If you pass a class or module FQN instead of a method FQN, the tool
+  automatically reroutes to `get_references`.
+- External library nodes appear in the graph with `null` for `file_path`,
+  `signature`, and line numbers.
+
+**`search_by_signature_patterns`** / **`search_by_body_patterns`** — search
+the UDG by regex against method/class declarations (signature) or their
+implementations (body). Each pattern must be single-line (no newlines).
+**Java only.**
+
+- `include_code_regex_list`: list of regex patterns to match (OR by default;
+  pass `regex_lists_operator: "AND"` to require all patterns)
+- `include_glob` / `exclude_glob`: file path filters (e.g., `**/model/**/*.java`)
+- `limit` (default 10): max results; response includes `truncated: true` if
+  more exist
+- Results grouped by pattern (OR mode) or under `"ALL_PATTERNS"` (AND mode)
+
+**`get_source_code`** — retrieves the full source code of a method or class
+given its FQN. Use after a search to inspect an actual implementation.
+**Java only.**
+
+All structural tools accept an optional `fields` parameter — a comma-
+separated list of field names to include in the response — useful for
+reducing response size when only specific data is needed.
 
 ### Agentic Analysis: What CI-Level Precision Means in Practice
 
@@ -423,7 +495,9 @@ A Phase 3 session for implementing Feature 4 (AffineTransform) looked like this:
    "Type System & Generics"], java)
 
 3. Claude calls:
-   get_current_architecture(depth=1)
+   get_current_architecture(depth=0)
+   → sees top-level package structure
+   get_current_architecture(path_prefix="clipper2", depth=1)
    → confirms clipper2.transform is a sensible new package
    → no existing transform package to conflict with
 
@@ -449,7 +523,7 @@ A Phase 3 session for implementing Feature 4 (AffineTransform) looked like this:
 
 | Metric | Phase 3 (AffineTransform) |
 |--------|--------------------------|
-| Tool calls (total) | 4 (1 guidelines + 1 architecture + 2 analysis) |
+| Tool calls (total) | 5 (1 guidelines + 2 architecture + 2 analysis) |
 | First-draft fixable issues | 0 |
 | Fix iterations needed | 0 |
 | Remaining issues in new code | 0 |
@@ -479,20 +553,44 @@ exists before it starts writing.
 - `"Exception/Error Handling"` — catches improper throws and empty catch blocks
 - `"Type System & Generics"` — relevant for utility methods with overloads
 
-### 2. Use Architecture Tools for Java — Even for New Packages
+For non-Java languages, the language-agnostic categories (`"Code Complexity &
+Maintainability"`, `"Naming Conventions & Code Style"`, `"Exception/Error
+Handling"`) apply broadly. Language-specific categories exist for Python
+(`"Django/Flask Frameworks"`, `"Data Science (Pandas, NumPy)"`,
+`"Type Hints & Dynamic Features"`) and JavaScript/TypeScript projects can
+benefit from `"REST API Development"`, `"Web Security (XSS, CSRF, Injection)"`,
+and `"Authentication & Authorization"`.
+
+### 2. Use Architecture Tools Before Writing — Not Just for New Packages
 
 Before creating the `clipper2.transform` package in the Phase 3 experiment,
-`get_current_architecture` confirmed:
+`get_current_architecture(depth=0)` confirmed the top-level package structure
+in one call. A second call with `path_prefix="clipper2"` and `depth=1`
+confirmed:
 - No existing `transform` package in the project
 - The new package would only need to depend on `clipper2.core`
 - No circular dependency risk
 
-This took 1 tool call and 2 seconds. It would have taken an experienced
-developer a minute of codebase exploration to verify the same thing.
+This took 2 tool calls and a few seconds. Without them, the AI might have
+placed the class in an existing package that already had too many
+responsibilities, or introduced a dependency that violated the intended
+architecture.
 
-For modifications to existing classes (not just new ones), `get_references`
-shows every class that imports the class you are changing. This is invaluable
-for understanding the blast radius of signature changes.
+**When to use each structural tool:**
+
+| Situation | Tool to use |
+|-----------|-------------|
+| Creating a new package or module | `get_current_architecture` (depth=0 first, then drill in) |
+| Adding a new class to an existing hierarchy | `get_type_hierarchy` on the base class |
+| Changing a class's public API | `get_references` — see every caller |
+| Understanding what a method delegates to | `get_downstream_call_flow` (Java only) |
+| Finding which entry points reach a method | `get_upstream_call_flow` (Java only) |
+| Finding an existing pattern to replicate | `search_by_signature_patterns` (Java only) |
+| Checking if a dependency is allowed | `get_intended_architecture` |
+
+For modifications to existing classes, `get_references` returns only **direct**
+references — not transitive ones. If you need the full impact, combine it
+with `get_downstream_call_flow` on the specific method being changed.
 
 ### 3. Scope Analysis to the File Being Changed
 
