@@ -217,10 +217,10 @@ progressively adopt more automation as they build confidence.
 
 ### What You Need
 
-**SonarQube Cloud Enterprise account** — The MCP server connects to
+**SonarQube Cloud Enterprise or Teams account** — The MCP server connects to
 SonarQube Cloud to retrieve your project's configured rules and to submit
 files for analysis. The Agentic Analysis feature (`run_advanced_code_analysis`)
-requires a SonarQube Cloud Enterprise subscription. You will also need your
+requires a SonarQube Cloud Enterprise or Teams subscription. You will also need your
 **organization ID** and a **project key** for an existing project analysed in
 SonarQube Cloud using a supported language (Java, Python, JavaScript/TypeScript,
 CSS, HTML, or XML).
@@ -261,11 +261,10 @@ claude mcp add sonarqube -s user \
   -e SONARQUBE_ORG=your_org_id \
   -e SONARQUBE_PROJECT_KEY=your_project_key \
   -e SONARQUBE_TOOLSETS=cag,projects,analysis \
-  -e SONARQUBE_ADVANCED_ANALYSIS_ENABLED=true \
   -- docker run -i --rm --pull=always \
   -e SONARQUBE_URL -e SONARQUBE_TOKEN \
   -e SONARQUBE_ORG -e SONARQUBE_PROJECT_KEY \
-  -e SONARQUBE_TOOLSETS -e SONARQUBE_ADVANCED_ANALYSIS_ENABLED \
+  -e SONARQUBE_TOOLSETS \
   -v "$(pwd):/app/mcp-workspace:rw" mcp/sonarqube
 ```
 
@@ -275,7 +274,6 @@ Claude Code session for this project. The key environment variables:
 | Variable | Purpose |
 |----------|---------|
 | `SONARQUBE_TOOLSETS=cag,projects,analysis` | Enables Context Augmentation and Agentic Analysis tools |
-| `SONARQUBE_ADVANCED_ANALYSIS_ENABLED=true` | Required for `run_advanced_code_analysis` |
 
 Additional toolsets (`issues`, `quality-gates`, `rules`, `duplications`,
 `measures`, `security-hotspots`, `dependency-risks`) can be added to
